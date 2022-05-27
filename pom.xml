@@ -20,6 +20,16 @@
             <groupId>de.sciss</groupId>
             <artifactId>abc4j</artifactId>
             <version>0.6.0</version>
-        </dependency>  
+        </dependency>
+        <dependency>
+            <groupId>de.sciss</groupId>
+            <artifactId>abc4j-abcynth</artifactId>
+            <version>0.6.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.wmn4j</groupId>
+            <artifactId>wmn4j</artifactId>
+            <version>0.5.3</version>
+        </dependency>
     </dependencies>
 </project>

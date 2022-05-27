@@ -24,6 +24,14 @@ import javax.sound.midi.Receiver;
 import javax.sound.midi.Transmitter;
 import javax.swing.ComboBoxModel;
 import javax.swing.DefaultComboBoxModel;
+import org.wmn4j.notation.ChordBuilder;
+import org.wmn4j.notation.Duration;
+import org.wmn4j.notation.DurationalBuilder;
+import org.wmn4j.notation.MeasureBuilder;
+import org.wmn4j.notation.NoteBuilder;
+import org.wmn4j.notation.PartBuilder;
+import org.wmn4j.notation.RestBuilder;
+import org.wmn4j.notation.ScoreBuilder;
 
 /**
  *
@@ -113,18 +121,26 @@ public class MainFrame extends javax.swing.JFrame {
         cbMidiIn.setModel(new DefaultComboBoxModel<Stringable<MidiDevice>>(transmitters.toArray(devicesArray)));
         cbMidiOut.setModel(new DefaultComboBoxModel<Stringable<MidiDevice>>(receivers.toArray(devicesArray)));
         
+        ScoreBuilder sb = new ScoreBuilder();
+        sb.addPart(new PartBuilder("melody")
+                .add(new MeasureBuilder()
+                        .setClef(Clef.SOPRANO())
+                        .addToVoice(0, new RestBuilder(Duration.of(1, 1)))));
+        
         JScoreComponent score = new JScoreComponent();
         jSplitPane1.setRightComponent(score);
         
         Tune tune = new Tune();
-        tune.getMusic().getVoice("Piano").addElement(new Note((byte)5));
+        tune.getMusic().getVoice("Piano").addElement(new Note((byte)100));
+        tune.getMusic().getVoice("Piano").addElement(new Note((byte)100));
+        tune.getMusic().getVoice("Piano").addElement(new Note((byte)100));
         tune.getMusic().getVoice("Piano").addElement(new Note((byte)100));
         jButton1.addActionListener(new java.awt.event.ActionListener() {
             int i = 0;
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 Voice v = tune.getMusic().getVoice("Piano");
                 try {
-                    v.addElement(new Note((byte)(i++)));
+                    v.addElement(new Note((byte)100));
                     score.refresh();
                     System.out.println("success " + i);
                 } catch (Throwable t) {
