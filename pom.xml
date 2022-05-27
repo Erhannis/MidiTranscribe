@@ -17,19 +17,19 @@
             <version>0.1.0-SNAPSHOT</version>
         </dependency>
         <dependency>
-            <groupId>de.sciss</groupId>
-            <artifactId>abc4j</artifactId>
-            <version>0.6.0</version>
-        </dependency>
-        <dependency>
-            <groupId>de.sciss</groupId>
-            <artifactId>abc4j-abcynth</artifactId>
-            <version>0.6.0</version>
-        </dependency>
-        <dependency>
             <groupId>org.wmn4j</groupId>
             <artifactId>wmn4j</artifactId>
             <version>0.5.3</version>
+        </dependency>
+        <dependency>
+            <groupId>cspforjava</groupId>
+            <artifactId>jcsp</artifactId>
+            <version>1.3.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>cspforjava</groupId>
+            <artifactId>jcsp-utils</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
 </project>

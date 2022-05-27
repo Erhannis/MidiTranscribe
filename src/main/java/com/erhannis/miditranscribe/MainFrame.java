@@ -4,12 +4,9 @@
  */
 package com.erhannis.miditranscribe;
 
-import abc.notation.MusicElement;
-import abc.notation.Note;
-import abc.notation.Tune;
-import abc.notation.Voice;
-import abc.ui.swing.JScoreComponent;
 import com.erhannis.mathnstuff.Stringable;
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,25 +21,77 @@ import javax.sound.midi.Receiver;
 import javax.sound.midi.Transmitter;
 import javax.swing.ComboBoxModel;
 import javax.swing.DefaultComboBoxModel;
+import jcsp.helpers.JcspUtils;
+import jcsp.helpers.NameParallel;
+import jcsp.lang.Alternative;
+import jcsp.lang.AltingChannelInput;
+import jcsp.lang.Any2OneChannel;
+import jcsp.lang.CSProcess;
+import jcsp.lang.Channel;
+import jcsp.lang.ChannelOutput;
+import jcsp.lang.Guard;
+import jcsp.lang.ProcessManager;
+import jcsp.util.InfiniteBuffer;
+import org.wmn4j.io.musicxml.MusicXmlWriter;
 import org.wmn4j.notation.ChordBuilder;
+import org.wmn4j.notation.Clef;
+import org.wmn4j.notation.Clef.Symbol;
 import org.wmn4j.notation.Duration;
 import org.wmn4j.notation.DurationalBuilder;
 import org.wmn4j.notation.MeasureBuilder;
 import org.wmn4j.notation.NoteBuilder;
 import org.wmn4j.notation.PartBuilder;
+import org.wmn4j.notation.Pitch;
 import org.wmn4j.notation.RestBuilder;
+import org.wmn4j.notation.Score;
 import org.wmn4j.notation.ScoreBuilder;
+import org.wmn4j.notation.TimeSignature;
 
 /**
  *
  * @author erhannis
  */
 public class MainFrame extends javax.swing.JFrame {
-
+    private final ChannelOutput<MidiMessage> rxMidiOut;
     /**
      * Creates new form MainFrame
      */
     public MainFrame() {
+        Any2OneChannel<MidiMessage> rxMidiChannel = Channel.<MidiMessage> any2one(new InfiniteBuffer<>());
+        AltingChannelInput<MidiMessage> rxMidiIn = rxMidiChannel.in();
+        rxMidiOut = JcspUtils.logDeadlock(rxMidiChannel.out());
+
+        Any2OneChannel<DurationalBuilder> previewDurationalChannel = Channel.<DurationalBuilder> any2one();
+        AltingChannelInput<DurationalBuilder> previewDurationalIn = previewDurationalChannel.in();
+        ChannelOutput<DurationalBuilder> previewDurationalOut = JcspUtils.logDeadlock(previewDurationalChannel.out());
+
+        Any2OneChannel<DurationalBuilder> createDurationalChannel = Channel.<DurationalBuilder> any2one();
+        AltingChannelInput<DurationalBuilder> createDurationalIn = createDurationalChannel.in();
+        ChannelOutput<DurationalBuilder> createDurationalOut = JcspUtils.logDeadlock(createDurationalChannel.out());
+        
+        new ProcessManager(new NameParallel(new CSProcess[] {
+            new MTProcess(rxMidiIn, previewDurationalOut, createDurationalOut),
+            () -> {
+                Thread.currentThread().setName("UIProcess");
+                Alternative alt = new Alternative(new Guard[]{previewDurationalIn, createDurationalIn});
+                while (true) {
+                    switch (alt.priSelect()) {
+                        case 0: { // previewDurationalIn
+                            DurationalBuilder db = previewDurationalIn.read();
+                            System.out.println("preview: " + db);
+                            break;
+                        }
+                        case 1: { // createDurationalIn
+                            DurationalBuilder db = createDurationalIn.read();
+                            System.out.println("create: " + db);
+                            break;
+                        }
+                    }
+                }
+            }
+        })).start();
+        
+        
         initComponents();
 
         ArrayList<Stringable<MidiDevice>> transmitters = new ArrayList<>();
@@ -124,42 +173,31 @@ public class MainFrame extends javax.swing.JFrame {
         ScoreBuilder sb = new ScoreBuilder();
         sb.addPart(new PartBuilder("melody")
                 .add(new MeasureBuilder()
-                        .setClef(Clef.SOPRANO())
-                        .addToVoice(0, new RestBuilder(Duration.of(1, 1)))));
+                        .setClef(Clef.of(Symbol.C, 3))
+                        .setTimeSignature(TimeSignature.of(4, 4))
+                        .addToVoice(0, new RestBuilder(Duration.of(1, 1)))
+                        .addToVoice(0, new NoteBuilder(Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, 0), Duration.of(1, 1)))
+                        .addToVoice(0, new ChordBuilder(Arrays.asList(
+                                new NoteBuilder(Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, 0), Duration.of(2, 1)),
+                                new NoteBuilder(Pitch.of(Pitch.Base.E, Pitch.Accidental.NATURAL, 0), Duration.of(2, 1)),
+                                new NoteBuilder(Pitch.of(Pitch.Base.G, Pitch.Accidental.NATURAL, 0), Duration.of(2, 1))
+                        )))
+                )
+        );
+        Score score = sb.build();
+        try {
+            MusicXmlWriter.writerFor(score, new File("file.mx").toPath()).write();
+        } catch (IOException ex) {
+            Logger.getLogger(MainFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
         
-        JScoreComponent score = new JScoreComponent();
-        jSplitPane1.setRightComponent(score);
+        //jSplitPane1.setRightComponent();
         
-        Tune tune = new Tune();
-        tune.getMusic().getVoice("Piano").addElement(new Note((byte)100));
-        tune.getMusic().getVoice("Piano").addElement(new Note((byte)100));
-        tune.getMusic().getVoice("Piano").addElement(new Note((byte)100));
-        tune.getMusic().getVoice("Piano").addElement(new Note((byte)100));
         jButton1.addActionListener(new java.awt.event.ActionListener() {
             int i = 0;
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                Voice v = tune.getMusic().getVoice("Piano");
-                try {
-                    v.addElement(new Note((byte)100));
-                    score.refresh();
-                    System.out.println("success " + i);
-                } catch (Throwable t) {
-                    System.err.println("ERROR: " + i + " " + t);
-                    //t.printStackTrace();
-                    v.remove(v.size()-1);
-                }
             }
         });
-        score.setTune(tune);
-        
-        score.getBounds().width = 100;
-        score.getBounds().height = 100;
-        
-        score.refresh();
-        score.invalidate();
-        score.validate();
-        score.revalidate();
-        score.repaint();
     }
 
     /**
@@ -279,6 +317,7 @@ public class MainFrame extends javax.swing.JFrame {
                     @Override
                     public void send(MidiMessage message, long timeStamp) {
                         System.out.println("MIDI " + mdFrom.getDeviceInfo() + " SEND " + Arrays.toString(message.getMessage()));
+                        rxMidiOut.write(message);
                         if (mdTo != null) {
                             rx.send(message, timeStamp);
                         }
