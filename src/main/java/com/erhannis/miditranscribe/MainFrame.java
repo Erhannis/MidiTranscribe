@@ -84,7 +84,9 @@ public class MainFrame extends javax.swing.JFrame {
             () -> {
                 Thread.currentThread().setName("UIProcess");
 
-                MeasureBuilder mb = new MeasureBuilder()
+                PartBuilder pb = new PartBuilder("melody");
+                int mbi = 1;
+                MeasureBuilder mb = new MeasureBuilder(mbi++)
                         .setClef(Clef.of(Symbol.G, 2)) //TODO Do
                         .setTimeSignature(TimeSignature.of(4, 4)) //TODO Do
                         .setKeySignature(KeySignatures.CMAJ_AMIN); //TODO Do
@@ -102,14 +104,18 @@ public class MainFrame extends javax.swing.JFrame {
                             DurationalBuilder db = createDurationalIn.read();
                             mb.addToVoice(0, db);
                             System.out.println("create: " + db);
+                            if (mb.isFull() || mb.isOverflowing()) {
+                                pb.add(mb);
+                                mb = MeasureBuilder.withAttributesOf(mb);
+                                mb.setNumber(mbi++);
+                            }
                             break;
                         }
                         case 2: { // saveScoreIn
                             String filename = saveScoreIn.read();
                             ScoreBuilder sb = new ScoreBuilder();
-                            sb.addPart(new PartBuilder("melody")
-                                    .add(mb)
-                            );
+                            pb.add(mb);
+                            sb.addPart(pb);
                             Score score = sb.build();
                             try {
                                 MusicXmlWriter.writerFor(score, new File(filename).toPath()).write();
