@@ -28,6 +28,7 @@ import org.wmn4j.notation.RestBuilder;
  * @author erhannis
  */
 public class MTProcess implements CSProcess {
+
     private final AltingChannelInput<MidiMessage> rxMidiIn;
     private final ChannelOutput<DurationalBuilder> previewDurationalOut;
     private final ChannelOutput<DurationalBuilder> createDurationalOut;
@@ -37,7 +38,7 @@ public class MTProcess implements CSProcess {
         this.previewDurationalOut = previewDurationalOut;
         this.createDurationalOut = createDurationalOut;
     }
-    
+
     @Override
     public void run() {
         Thread.currentThread().setName("MTProcess");
@@ -52,9 +53,49 @@ public class MTProcess implements CSProcess {
                     MidiMessage msg = rxMidiIn.read();
                     if (Utils.isMidiNoteOn(msg)) {
                         int pitch = Utils.getMidiPitch(msg);
-                        if (36 <= pitch && pitch <= 47) {
+                        if (36 <= pitch && pitch <= 48) { // Lowest C to C above, inclusive
                             // Special key, triggers completion
-                            System.err.println("//DO //TODO Do duration");
+                            int num = 1;
+                            int den = 8;
+                            switch (pitch) {
+                                // White keys
+                                case 36:
+                                    num = 1;
+                                    break;
+                                case 38:
+                                    num = 2;
+                                    break;
+                                case 40:
+                                    num = 3;
+                                    break;
+                                case 41:
+                                    num = 4;
+                                    break;
+                                case 43:
+                                    num = 5;
+                                    break;
+                                case 45:
+                                    num = 6;
+                                    break;
+                                case 47:
+                                    num = 7;
+                                    break;
+                                case 48:
+                                    num = 8;
+                                    break;
+                                // Black keys //TODO Figure out what these should do
+                                case 37:
+                                    break;
+                                case 39:
+                                    break;
+                                case 42:
+                                    break;
+                                case 44:
+                                    break;
+                                case 46:
+                                    break;
+                            }
+                            duration = Duration.of(num, den);
                             send = true;
                             create = true;
                         } else {
@@ -69,10 +110,10 @@ public class MTProcess implements CSProcess {
                     }
                     break;
             }
-            
+
             if (send) {
                 ArrayList<NoteBuilder> nbs = new ArrayList<>();
-                for (List<Integer> note: notes.map.keySet()) {
+                for (List<Integer> note : notes.map.keySet()) {
                     int channel = note.get(0); //TODO Use?
                     int pitch = note.get(1);
                     nbs.add(new NoteBuilder(Utils.midiToPitch(pitch), duration));

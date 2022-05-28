@@ -38,6 +38,8 @@ import org.wmn4j.notation.Clef;
 import org.wmn4j.notation.Clef.Symbol;
 import org.wmn4j.notation.Duration;
 import org.wmn4j.notation.DurationalBuilder;
+import org.wmn4j.notation.KeySignature;
+import org.wmn4j.notation.KeySignatures;
 import org.wmn4j.notation.MeasureBuilder;
 import org.wmn4j.notation.NoteBuilder;
 import org.wmn4j.notation.PartBuilder;
@@ -52,46 +54,75 @@ import org.wmn4j.notation.TimeSignature;
  * @author erhannis
  */
 public class MainFrame extends javax.swing.JFrame {
+
     private final ChannelOutput<MidiMessage> rxMidiOut;
+
     /**
      * Creates new form MainFrame
      */
     public MainFrame() {
-        Any2OneChannel<MidiMessage> rxMidiChannel = Channel.<MidiMessage> any2one(new InfiniteBuffer<>());
+        Any2OneChannel<MidiMessage> rxMidiChannel = Channel.<MidiMessage>any2one(new InfiniteBuffer<>());
         AltingChannelInput<MidiMessage> rxMidiIn = rxMidiChannel.in();
         rxMidiOut = JcspUtils.logDeadlock(rxMidiChannel.out());
 
-        Any2OneChannel<DurationalBuilder> previewDurationalChannel = Channel.<DurationalBuilder> any2one();
+        Any2OneChannel<DurationalBuilder> previewDurationalChannel = Channel.<DurationalBuilder>any2one();
         AltingChannelInput<DurationalBuilder> previewDurationalIn = previewDurationalChannel.in();
         ChannelOutput<DurationalBuilder> previewDurationalOut = JcspUtils.logDeadlock(previewDurationalChannel.out());
 
-        Any2OneChannel<DurationalBuilder> createDurationalChannel = Channel.<DurationalBuilder> any2one();
+        Any2OneChannel<DurationalBuilder> createDurationalChannel = Channel.<DurationalBuilder>any2one();
         AltingChannelInput<DurationalBuilder> createDurationalIn = createDurationalChannel.in();
         ChannelOutput<DurationalBuilder> createDurationalOut = JcspUtils.logDeadlock(createDurationalChannel.out());
+
+        Any2OneChannel<String> saveScoreChannel = Channel.<String>any2one();
+        AltingChannelInput<String> saveScoreIn = saveScoreChannel.in();
+        ChannelOutput<String> saveScoreOut = JcspUtils.logDeadlock(saveScoreChannel.out());
+
+        Utils.midiToPitch(30);
         
-        new ProcessManager(new NameParallel(new CSProcess[] {
+        new ProcessManager(new NameParallel(new CSProcess[]{
             new MTProcess(rxMidiIn, previewDurationalOut, createDurationalOut),
             () -> {
                 Thread.currentThread().setName("UIProcess");
-                Alternative alt = new Alternative(new Guard[]{previewDurationalIn, createDurationalIn});
+
+                MeasureBuilder mb = new MeasureBuilder()
+                        .setClef(Clef.of(Symbol.G, 2)) //TODO Do
+                        .setTimeSignature(TimeSignature.of(4, 4)) //TODO Do
+                        .setKeySignature(KeySignatures.CMAJ_AMIN); //TODO Do
+
+                Alternative alt = new Alternative(new Guard[]{previewDurationalIn, createDurationalIn, saveScoreIn});
                 while (true) {
                     switch (alt.priSelect()) {
                         case 0: { // previewDurationalIn
                             DurationalBuilder db = previewDurationalIn.read();
+                            //DO //TODO ???
                             System.out.println("preview: " + db);
                             break;
                         }
                         case 1: { // createDurationalIn
                             DurationalBuilder db = createDurationalIn.read();
+                            mb.addToVoice(0, db);
                             System.out.println("create: " + db);
+                            break;
+                        }
+                        case 2: { // saveScoreIn
+                            String filename = saveScoreIn.read();
+                            ScoreBuilder sb = new ScoreBuilder();
+                            sb.addPart(new PartBuilder("melody")
+                                    .add(mb)
+                            );
+                            Score score = sb.build();
+                            try {
+                                MusicXmlWriter.writerFor(score, new File(filename).toPath()).write();
+                            } catch (IOException ex) {
+                                Logger.getLogger(MainFrame.class.getName()).log(Level.SEVERE, null, ex);
+                            }
                             break;
                         }
                     }
                 }
             }
         })).start();
-        
-        
+
         initComponents();
 
         ArrayList<Stringable<MidiDevice>> transmitters = new ArrayList<>();
@@ -165,37 +196,49 @@ public class MainFrame extends javax.swing.JFrame {
         }
         System.out.println("");
         System.out.println("MIDI RX DONE");
-        
+
         Stringable<MidiDevice>[] devicesArray = (Stringable<MidiDevice>[]) Array.newInstance(Stringable.class, 0);
         cbMidiIn.setModel(new DefaultComboBoxModel<Stringable<MidiDevice>>(transmitters.toArray(devicesArray)));
         cbMidiOut.setModel(new DefaultComboBoxModel<Stringable<MidiDevice>>(receivers.toArray(devicesArray)));
-        
+
         ScoreBuilder sb = new ScoreBuilder();
         sb.addPart(new PartBuilder("melody")
                 .add(new MeasureBuilder()
-                        .setClef(Clef.of(Symbol.G, 2))
+                        .setClef(Clef.of(Symbol.G, 2)) // I don't know which line this is supposed to center on
                         .setTimeSignature(TimeSignature.of(4, 4))
-                        .addToVoice(0, new RestBuilder(Duration.of(1, 1)))
-                        .addToVoice(0, new NoteBuilder(Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, 0), Duration.of(1, 1)))
+                        .setKeySignature(KeySignatures.AFLATMAJ_FMIN)
+                        .addToVoice(0, new RestBuilder(Duration.of(1, 4)))
+                        .addToVoice(0, new NoteBuilder(Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, 4), Duration.of(1, 4)))
                         .addToVoice(0, new ChordBuilder(Arrays.asList(
-                                new NoteBuilder(Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, 0), Duration.of(2, 1)),
-                                new NoteBuilder(Pitch.of(Pitch.Base.E, Pitch.Accidental.NATURAL, 0), Duration.of(2, 1)),
-                                new NoteBuilder(Pitch.of(Pitch.Base.G, Pitch.Accidental.NATURAL, 0), Duration.of(2, 1))
+                                new NoteBuilder(Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, 4), Duration.of(1, 2)),
+                                new NoteBuilder(Pitch.of(Pitch.Base.E, Pitch.Accidental.NATURAL, 4), Duration.of(1, 2)),
+                                new NoteBuilder(Pitch.of(Pitch.Base.G, Pitch.Accidental.NATURAL, 4), Duration.of(1, 2))
                         )))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(60), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(61), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(62), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(63), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(64), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(65), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(66), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(67), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(68), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(69), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(70), Duration.of(1, 16)))
+                        .addToVoice(0, new NoteBuilder(Utils.MIDI_TO_PITCH.get(71), Duration.of(1, 1)))
                 )
         );
         Score score = sb.build();
         try {
-            MusicXmlWriter.writerFor(score, new File("example.mxl").toPath()).write();
+            MusicXmlWriter.writerFor(score, new File("example.xml").toPath()).write();
         } catch (IOException ex) {
             Logger.getLogger(MainFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
+
         //jSplitPane1.setRightComponent();
-        
-        jButton1.addActionListener(new java.awt.event.ActionListener() {
-            int i = 0;
+        btnSave.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveScoreOut.write(System.currentTimeMillis() + ".xml");
             }
         });
     }
@@ -214,7 +257,7 @@ public class MainFrame extends javax.swing.JFrame {
         cbMidiIn = new javax.swing.JComboBox<>();
         cbMidiOut = new javax.swing.JComboBox<>();
         btnGo = new javax.swing.JButton();
-        jButton1 = new javax.swing.JButton();
+        btnSave = new javax.swing.JButton();
         jPanel2 = new javax.swing.JPanel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -233,10 +276,10 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
 
-        jButton1.setText("jButton1");
-        jButton1.addActionListener(new java.awt.event.ActionListener() {
+        btnSave.setText("Save");
+        btnSave.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jButton1ActionPerformed(evt);
+                btnSaveActionPerformed(evt);
             }
         });
 
@@ -252,8 +295,8 @@ public class MainFrame extends javax.swing.JFrame {
                     .addGroup(jPanel1Layout.createSequentialGroup()
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(btnGo)
-                            .addComponent(jButton1))
-                        .addGap(0, 538, Short.MAX_VALUE)))
+                            .addComponent(btnSave))
+                        .addGap(0, 557, Short.MAX_VALUE)))
                 .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
@@ -266,7 +309,7 @@ public class MainFrame extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(btnGo)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 70, Short.MAX_VALUE)
-                .addComponent(jButton1)
+                .addComponent(btnSave)
                 .addContainerGap())
         );
 
@@ -334,9 +377,9 @@ public class MainFrame extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_btnGoActionPerformed
 
-    private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
+    private void btnSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveActionPerformed
         // TODO add your handling code here:
-    }//GEN-LAST:event_jButton1ActionPerformed
+    }//GEN-LAST:event_btnSaveActionPerformed
 
     /**
      * @param args the command line arguments
@@ -351,9 +394,9 @@ public class MainFrame extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnGo;
+    private javax.swing.JButton btnSave;
     private javax.swing.JComboBox<Stringable<MidiDevice>> cbMidiIn;
     private javax.swing.JComboBox<Stringable<MidiDevice>> cbMidiOut;
-    private javax.swing.JButton jButton1;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JSplitPane jSplitPane1;
