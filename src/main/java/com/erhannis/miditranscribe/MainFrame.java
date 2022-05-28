@@ -173,7 +173,7 @@ public class MainFrame extends javax.swing.JFrame {
         ScoreBuilder sb = new ScoreBuilder();
         sb.addPart(new PartBuilder("melody")
                 .add(new MeasureBuilder()
-                        .setClef(Clef.of(Symbol.C, 3))
+                        .setClef(Clef.of(Symbol.G, 2))
                         .setTimeSignature(TimeSignature.of(4, 4))
                         .addToVoice(0, new RestBuilder(Duration.of(1, 1)))
                         .addToVoice(0, new NoteBuilder(Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, 0), Duration.of(1, 1)))
@@ -186,7 +186,7 @@ public class MainFrame extends javax.swing.JFrame {
         );
         Score score = sb.build();
         try {
-            MusicXmlWriter.writerFor(score, new File("file.mx").toPath()).write();
+            MusicXmlWriter.writerFor(score, new File("example.mxl").toPath()).write();
         } catch (IOException ex) {
             Logger.getLogger(MainFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
