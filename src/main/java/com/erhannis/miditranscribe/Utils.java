@@ -6,7 +6,11 @@ package com.erhannis.miditranscribe;
 
 import java.util.HashMap;
 import javax.sound.midi.MidiMessage;
+import org.wmn4j.notation.Clef;
+import org.wmn4j.notation.Clef.Symbol;
+import org.wmn4j.notation.KeySignature;
 import org.wmn4j.notation.Pitch;
+import org.wmn4j.notation.Pitch.Base;
 
 /**
  *
@@ -14,7 +18,7 @@ import org.wmn4j.notation.Pitch;
  */
 public class Utils {
     public static HashMap<Integer, Pitch> MIDI_TO_PITCH = new HashMap<Integer, Pitch>() {{
-        for (int octave = 0; octave < 7; octave++) {
+        for (int octave = 0; octave < 8; octave++) {
             int offset = (octave-4)*12;
             put(60+offset, Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, octave));
             put(61+offset, Pitch.of(Pitch.Base.C, Pitch.Accidental.SHARP, octave));
@@ -53,5 +57,71 @@ public class Utils {
 
     public static int getMidiVelocity(MidiMessage msg) {
         return msg.getMessage()[2];
+    }
+    
+    public static int getLineSpace(Clef clef, Pitch pitch) {
+        /*
+        
+        --8--
+          7
+        --6--
+          5
+        --4--
+          3
+        --2--
+          1
+        --0--
+        
+        */
+        int ls;
+        Base b = pitch.getBase();
+        if (b == Base.C) {
+            ls = -2;
+        } else if (b == Base.D) {
+            ls = -1;
+        } else if (b == Base.E) {
+            ls = 0;
+        } else if (b == Base.F) {
+            ls = 1;
+        } else if (b == Base.G) {
+            ls = 2;
+        } else if (b == Base.A) {
+            ls = 3;
+        } else if (b == Base.B) {
+            ls = 4;
+        } else {
+            throw new RuntimeException("Invalid pitch? : " + pitch);
+        }
+        
+        if (clef == null || clef.getSymbol() == Symbol.G) {
+            // Treble
+            // Default
+        } else if (clef.getSymbol() == Symbol.F) {
+            // Bass
+            ls += 12;
+        } else if (clef.getSymbol() == Symbol.C) {
+            // C-clef
+            ls += 6;
+        }
+        ls += 7*(pitch.getOctave()-4);
+        
+        return ls;
+    }
+    
+    public static boolean qShowAccidental(KeySignature keySignature, Pitch pitch) {
+        switch (pitch.getAccidental()) {
+            case DOUBLE_FLAT:
+                throw new RuntimeException("UNHANDLED ACCIDENTAL");
+            case FLAT:
+                return !keySignature.getFlats().contains(pitch.getBase());
+            case NATURAL:
+                return keySignature.getFlats().contains(pitch.getBase()) || keySignature.getSharps().contains(pitch.getBase());
+            case SHARP:
+                return !keySignature.getSharps().contains(pitch.getBase());
+            case DOUBLE_SHARP:
+                throw new RuntimeException("UNHANDLED ACCIDENTAL");
+            default:
+                throw new RuntimeException("UNHANDLED ACCIDENTAL");
+        }
     }
 }

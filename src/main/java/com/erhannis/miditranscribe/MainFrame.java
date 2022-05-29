@@ -54,13 +54,21 @@ import org.wmn4j.notation.TimeSignature;
  * @author erhannis
  */
 public class MainFrame extends javax.swing.JFrame {
+    private static final String DEFAULT_INPUT_MIDI = "hw:1"; // A hack for my own convenience; change it at will
 
     private final ChannelOutput<MidiMessage> rxMidiOut;
+
+    private DurationalFrame previewFrame;
 
     /**
      * Creates new form MainFrame
      */
     public MainFrame() {
+        Clef clef = Clef.of(Symbol.G, 2);
+        TimeSignature timeSignature = TimeSignature.of(4, 4);
+        //KeySignature keySignature = KeySignatures.CMAJ_AMIN;
+        KeySignature keySignature = KeySignatures.FSHARPMAJ_DSHARPMIN;
+
         Any2OneChannel<MidiMessage> rxMidiChannel = Channel.<MidiMessage>any2one(new InfiniteBuffer<>());
         AltingChannelInput<MidiMessage> rxMidiIn = rxMidiChannel.in();
         rxMidiOut = JcspUtils.logDeadlock(rxMidiChannel.out());
@@ -77,8 +85,6 @@ public class MainFrame extends javax.swing.JFrame {
         AltingChannelInput<String> saveScoreIn = saveScoreChannel.in();
         ChannelOutput<String> saveScoreOut = JcspUtils.logDeadlock(saveScoreChannel.out());
 
-        Utils.midiToPitch(30);
-        
         new ProcessManager(new NameParallel(new CSProcess[]{
             new MTProcess(rxMidiIn, previewDurationalOut, createDurationalOut),
             () -> {
@@ -87,43 +93,47 @@ public class MainFrame extends javax.swing.JFrame {
                 PartBuilder pb = new PartBuilder("melody");
                 int mbi = 1;
                 MeasureBuilder mb = new MeasureBuilder(mbi++)
-                        .setClef(Clef.of(Symbol.G, 2)) //TODO Do
-                        .setTimeSignature(TimeSignature.of(4, 4)) //TODO Do
-                        .setKeySignature(KeySignatures.CMAJ_AMIN); //TODO Do
+                        .setClef(clef) //TODO Do
+                        .setTimeSignature(timeSignature) //TODO Do
+                        .setKeySignature(keySignature); //TODO Do
 
                 Alternative alt = new Alternative(new Guard[]{previewDurationalIn, createDurationalIn, saveScoreIn});
                 while (true) {
-                    switch (alt.priSelect()) {
-                        case 0: { // previewDurationalIn
-                            DurationalBuilder db = previewDurationalIn.read();
-                            //DO //TODO ???
-                            System.out.println("preview: " + db);
-                            break;
-                        }
-                        case 1: { // createDurationalIn
-                            DurationalBuilder db = createDurationalIn.read();
-                            mb.addToVoice(0, db);
-                            System.out.println("create: " + db);
-                            if (mb.isFull() || mb.isOverflowing()) {
+                    try {
+                        switch (alt.priSelect()) {
+                            case 0: { // previewDurationalIn
+                                DurationalBuilder db = previewDurationalIn.read();
+                                System.out.println("preview: " + db);
+                                previewFrame.setDurational(db.build());
+                                break;
+                            }
+                            case 1: { // createDurationalIn
+                                DurationalBuilder db = createDurationalIn.read();
+                                mb.addToVoice(0, db);
+                                System.out.println("create: " + db);
+                                if (mb.isFull() || mb.isOverflowing()) {
+                                    pb.add(mb);
+                                    mb = MeasureBuilder.withAttributesOf(mb);
+                                    mb.setNumber(mbi++);
+                                }
+                                break;
+                            }
+                            case 2: { // saveScoreIn
+                                String filename = saveScoreIn.read();
+                                ScoreBuilder sb = new ScoreBuilder();
                                 pb.add(mb);
-                                mb = MeasureBuilder.withAttributesOf(mb);
-                                mb.setNumber(mbi++);
+                                sb.addPart(pb);
+                                Score score = sb.build();
+                                try {
+                                    MusicXmlWriter.writerFor(score, new File(filename).toPath()).write();
+                                } catch (IOException ex) {
+                                    Logger.getLogger(MainFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                }
+                                break;
                             }
-                            break;
                         }
-                        case 2: { // saveScoreIn
-                            String filename = saveScoreIn.read();
-                            ScoreBuilder sb = new ScoreBuilder();
-                            pb.add(mb);
-                            sb.addPart(pb);
-                            Score score = sb.build();
-                            try {
-                                MusicXmlWriter.writerFor(score, new File(filename).toPath()).write();
-                            } catch (IOException ex) {
-                                Logger.getLogger(MainFrame.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                            break;
-                        }
+                    } catch (Throwable t) {
+                        t.printStackTrace();
                     }
                 }
             }
@@ -207,12 +217,21 @@ public class MainFrame extends javax.swing.JFrame {
         cbMidiIn.setModel(new DefaultComboBoxModel<Stringable<MidiDevice>>(transmitters.toArray(devicesArray)));
         cbMidiOut.setModel(new DefaultComboBoxModel<Stringable<MidiDevice>>(receivers.toArray(devicesArray)));
 
+        for (Stringable<MidiDevice> smd : transmitters) {
+            if (smd.name.contains(DEFAULT_INPUT_MIDI)) {
+                cbMidiIn.getModel().setSelectedItem(smd);
+                btnGoActionPerformed(null);
+                break;
+            }
+        }
+        
         ScoreBuilder sb = new ScoreBuilder();
         sb.addPart(new PartBuilder("melody")
                 .add(new MeasureBuilder()
-                        .setClef(Clef.of(Symbol.G, 2)) // I don't know which line this is supposed to center on
-                        .setTimeSignature(TimeSignature.of(4, 4))
-                        .setKeySignature(KeySignatures.AFLATMAJ_FMIN)
+                        .setClef(clef)
+                        .setTimeSignature(timeSignature)
+                        .setKeySignature(keySignature)
+                        //TODO Set preview clef etc., too
                         .addToVoice(0, new RestBuilder(Duration.of(1, 4)))
                         .addToVoice(0, new NoteBuilder(Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, 4), Duration.of(1, 4)))
                         .addToVoice(0, new ChordBuilder(Arrays.asList(
@@ -247,6 +266,16 @@ public class MainFrame extends javax.swing.JFrame {
                 saveScoreOut.write(System.currentTimeMillis() + ".xml");
             }
         });
+
+        previewFrame = new DurationalFrame(new ChordBuilder(Arrays.asList(
+                new NoteBuilder(Pitch.of(Pitch.Base.C, Pitch.Accidental.NATURAL, 4), Duration.of(1, 2)),
+                new NoteBuilder(Pitch.of(Pitch.Base.E, Pitch.Accidental.NATURAL, 4), Duration.of(1, 2)),
+                new NoteBuilder(Pitch.of(Pitch.Base.G, Pitch.Accidental.NATURAL, 4), Duration.of(1, 2))
+        )).build()
+        );
+        previewFrame.setClef(clef);
+        previewFrame.setKeySignature(keySignature);
+        previewFrame.setVisible(true);
     }
 
     /**
