@@ -130,14 +130,31 @@ public class DurationalPanel extends javax.swing.JPanel {
 
         // Key signature
         {
+            int octave;
+            switch (clef.getSymbol()) {
+                case G: // Treble
+                    octave = 4;
+                    break;
+                case F: // Bass
+                    octave = 3;
+                    break;
+                case C: // C-clef
+                    octave = 4;
+                    break;
+                case PERCUSSION:
+                    octave = 4;
+                    break;
+                default:
+                    throw new RuntimeException("UNHANDLED CLEF");
+            }
             int dx = -OX/2;
             int smidge = LINE_SPACING / 2;
             for (Base b : keySignature.getFlats()) {
-                int y = OY + ((LINE_SPACING * Utils.getLineSpace(clef, Pitch.of(b, Accidental.FLAT, 4))) / 2);
+                int y = OY + ((LINE_SPACING * Utils.getLineSpace(clef, Pitch.of(b, Accidental.FLAT, octave))) / 2);
                 drawAccidental(g, Accidental.FLAT, OX+(dx+=smidge), y);
             }
             for (Base b : keySignature.getSharps()) {
-                int y = OY + ((LINE_SPACING * Utils.getLineSpace(clef, Pitch.of(b, Accidental.SHARP, 4))) / 2);
+                int y = OY + ((LINE_SPACING * Utils.getLineSpace(clef, Pitch.of(b, Accidental.SHARP, octave))) / 2);
                 drawAccidental(g, Accidental.SHARP, OX+(dx+=smidge), y);
             }
         }

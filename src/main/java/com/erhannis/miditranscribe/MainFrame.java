@@ -64,10 +64,12 @@ public class MainFrame extends javax.swing.JFrame {
      * Creates new form MainFrame
      */
     public MainFrame() {
-        Clef clef = Clef.of(Symbol.G, 2);
-        TimeSignature timeSignature = TimeSignature.of(4, 4);
+        //Clef clef = Clef.of(Symbol.G, 2);
+        Clef clef = Clef.of(Symbol.F, 2);
+        TimeSignature timeSignature = TimeSignature.of(2, 4);
         //KeySignature keySignature = KeySignatures.CMAJ_AMIN;
-        KeySignature keySignature = KeySignatures.FSHARPMAJ_DSHARPMIN;
+        KeySignature keySignature = KeySignatures.EMAJ_CSHARPMIN;
+        int TRANSPOSE = -1;
 
         Any2OneChannel<MidiMessage> rxMidiChannel = Channel.<MidiMessage>any2one(new InfiniteBuffer<>());
         AltingChannelInput<MidiMessage> rxMidiIn = rxMidiChannel.in();
@@ -103,19 +105,25 @@ public class MainFrame extends javax.swing.JFrame {
                         switch (alt.priSelect()) {
                             case 0: { // previewDurationalIn
                                 DurationalBuilder db = previewDurationalIn.read();
+                                if (TRANSPOSE != 0) {
+                                    db = Utils.transpose(db, TRANSPOSE);
+                                }
                                 System.out.println("preview: " + db);
                                 previewFrame.setDurational(db.build());
                                 break;
                             }
                             case 1: { // createDurationalIn
                                 DurationalBuilder db = createDurationalIn.read();
-                                mb.addToVoice(0, db);
-                                System.out.println("create: " + db);
+                                if (TRANSPOSE != 0) {
+                                    db = Utils.transpose(db, TRANSPOSE);
+                                }
                                 if (mb.isFull() || mb.isOverflowing()) {
                                     pb.add(mb);
                                     mb = MeasureBuilder.withAttributesOf(mb);
                                     mb.setNumber(mbi++);
                                 }
+                                mb.addToVoice(0, db);
+                                System.out.println("create: " + db);
                                 break;
                             }
                             case 2: { // saveScoreIn

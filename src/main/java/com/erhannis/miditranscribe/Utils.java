@@ -6,11 +6,15 @@ package com.erhannis.miditranscribe;
 
 import java.util.HashMap;
 import javax.sound.midi.MidiMessage;
+import org.wmn4j.notation.ChordBuilder;
 import org.wmn4j.notation.Clef;
 import org.wmn4j.notation.Clef.Symbol;
+import org.wmn4j.notation.DurationalBuilder;
 import org.wmn4j.notation.KeySignature;
+import org.wmn4j.notation.NoteBuilder;
 import org.wmn4j.notation.Pitch;
 import org.wmn4j.notation.Pitch.Base;
+import org.wmn4j.notation.RestBuilder;
 
 /**
  *
@@ -122,6 +126,33 @@ public class Utils {
                 throw new RuntimeException("UNHANDLED ACCIDENTAL");
             default:
                 throw new RuntimeException("UNHANDLED ACCIDENTAL");
+        }
+    }
+    
+    /**
+     * Warning: modifies DurationalBuilder in-place.
+     * @param db
+     * @param octave
+     * @return 
+     */
+    public static DurationalBuilder transpose(DurationalBuilder db, int octave) {
+        if (db instanceof RestBuilder) {
+            return db;
+        } else if (db instanceof NoteBuilder) {
+            NoteBuilder nb = (NoteBuilder) db;
+            Pitch p = nb.getPitch();
+            nb.setPitch(Pitch.of(p.getBase(), p.getAccidental(), p.getOctave()+octave));
+            return nb;
+        } else if (db instanceof ChordBuilder) {
+            ChordBuilder cb = (ChordBuilder) db;
+            for (NoteBuilder nb : cb) {
+                Pitch p = nb.getPitch();
+                nb.setPitch(Pitch.of(p.getBase(), p.getAccidental(), p.getOctave()+octave));
+            }
+            return cb;
+        } else {
+            //TODO Throw error?
+            return db;
         }
     }
 }
